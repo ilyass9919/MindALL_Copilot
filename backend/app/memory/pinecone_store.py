@@ -30,7 +30,7 @@ class PineconeMemoryStore:
 
         self.index = pc.Index(self.INDEX_NAME)
 
-        # Use OpenAI embeddings (compatible with your Azure endpoint)
+        # Use OpenAI embeddings 
         self.embeddings = OpenAIEmbeddings(
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_BASE_URL,

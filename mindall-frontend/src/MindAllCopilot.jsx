@@ -1,0 +1,727 @@
+import { useState, useEffect, useRef } from "react";
+
+const API = "http://127.0.0.1:8000";
+
+/* ── Google Fonts ─────────────────────────────────────────────────────────── */
+const fontLink = document.createElement("link");
+fontLink.rel = "stylesheet";
+fontLink.href = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap";
+document.head.appendChild(fontLink);
+
+/* ── Global styles ────────────────────────────────────────────────────────── */
+const globalStyle = document.createElement("style");
+globalStyle.textContent = `
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #FAFAF8; color: #1A1A1A; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #F0EDE8; }
+  ::-webkit-scrollbar-thumb { background: #C9A96E; border-radius: 2px; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+  .fade-up  { animation: fadeUp  0.6s ease both; }
+  .fade-in  { animation: fadeIn  0.4s ease both; }
+  .delay-1  { animation-delay: 0.1s; }
+  .delay-2  { animation-delay: 0.2s; }
+  .delay-3  { animation-delay: 0.3s; }
+  .delay-4  { animation-delay: 0.4s; }
+  .delay-5  { animation-delay: 0.5s; }
+
+  .btn-primary {
+    background: #1A1A1A; color: #FAFAF8;
+    border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 14px;
+    padding: 12px 28px; letter-spacing: 0.03em;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .btn-primary:hover  { background: #2D2D2D; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ghost {
+    background: transparent; color: #1A1A1A;
+    border: 1px solid #E0DBD4; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-weight: 400; font-size: 14px;
+    padding: 11px 28px; letter-spacing: 0.03em;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .btn-ghost:hover { border-color: #1A1A1A; background: #F5F2EE; }
+
+  .card {
+    background: #fff; border: 1px solid #E8E4DF;
+    transition: box-shadow 0.25s, transform 0.25s;
+  }
+  .card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.06); transform: translateY(-2px); }
+
+  .input-field {
+    width: 100%; padding: 12px 16px;
+    border: 1px solid #E0DBD4; background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; color: #1A1A1A;
+    outline: none; transition: border-color 0.2s;
+  }
+  .input-field:focus  { border-color: #C9A96E; }
+  .input-field::placeholder { color: #B8B0A8; }
+
+  .tag-marketing { background: #FFF3E8; color: #C97A2A; }
+  .tag-finance   { background: #E8F5F0; color: #2A9A70; }
+  .tag-strategy  { background: #EEF0FF; color: #4A5FBF; }
+  .tag-general   { background: #F5F2EE; color: #6B6560; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .chat-header { padding: 12px 16px !important; flex-wrap: wrap; gap: 8px; }
+    .chat-header-badges { display: none !important; }
+    .chat-messages { padding: 16px !important; }
+    .chat-input-bar { padding: 12px 16px 16px !important; }
+    .chat-msg-inner { max-width: 100% !important; }
+    .chat-user-bubble { max-width: 88% !important; }
+    .suggestions-wrap { padding: 0 16px 10px !important; }
+    .dashboard-body { padding: 24px 20px !important; }
+    .projects-grid { grid-template-columns: 1fr !important; }
+  }
+  @media (min-width: 769px) and (max-width: 1280px) {
+    .dashboard-body { padding: 48px 4% !important; }
+    .projects-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+`;
+document.head.appendChild(globalStyle);
+
+/* ── Agent badge ──────────────────────────────────────────────────────────── */
+const AgentBadge = ({ type }) => {
+  const map = {
+    marketing: { label: "Marketing", icon: "📣", cls: "tag-marketing" },
+    finance:   { label: "Finance",   icon: "💰", cls: "tag-finance"   },
+    strategy:  { label: "Strategy",  icon: "🧭", cls: "tag-strategy"  },
+  };
+  const a = map[type] || { label: type, icon: "🤖", cls: "tag-general" };
+  return (
+    <span className={a.cls} style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "3px 10px", fontSize: 11, fontWeight: 500,
+      letterSpacing: "0.04em", textTransform: "uppercase"
+    }}>
+      {a.icon} {a.label}
+    </span>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SCREEN 1 — LANDING
+════════════════════════════════════════════════════════════════════════════ */
+const LandingScreen = ({ onEnter }) => (
+  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+
+    {/* Nav */}
+    <nav style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      padding: "24px 5%", borderBottom: "1px solid #E8E4DF", background: "#FAFAF8"
+    }}>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 500, letterSpacing: "0.02em" }}>
+        Mind<span style={{ color: "#C9A96E" }}>All</span>
+      </div>
+      <button className="btn-primary" onClick={onEnter} style={{ padding: "10px 24px", fontSize: 13 }}>
+        Launch Copilot →
+      </button>
+    </nav>
+
+    {/* Hero */}
+    <main style={{
+      flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "80px 5%", width: "100%"
+    }}>
+      <div style={{ textAlign: "center" }}>
+        {/* Eyebrow */}
+        <div className="fade-up" style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "6px 16px", border: "1px solid #E0DBD4",
+          fontSize: 12, fontWeight: 500, letterSpacing: "0.08em",
+          textTransform: "uppercase", color: "#8A837C", marginBottom: 40
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#C9A96E", display: "inline-block" }} />
+          AI-Powered Entrepreneur Copilot
+        </div>
+
+        {/* Headline */}
+        <h1 className="fade-up delay-1" style={{
+          fontFamily: "'Cormorant Garamond', serif",
+          fontSize: "clamp(48px, 7vw, 80px)",
+          fontWeight: 400, lineHeight: 1.1,
+          letterSpacing: "-0.01em", marginBottom: 28, color: "#1A1A1A"
+        }}>
+          Your AI advisor for<br />
+          <span style={{ color: "#C9A96E", fontStyle: "italic" }}>every business decision</span>
+        </h1>
+
+        {/* Subline */}
+        <p className="fade-up delay-2" style={{
+          fontSize: 17, lineHeight: 1.7, color: "#6B6560",
+          maxWidth: 520, margin: "0 auto 48px", fontWeight: 300
+        }}>
+          Three specialized AI agents — Marketing, Finance, Strategy — working together
+          to guide you from idea to execution, every single day.
+        </p>
+
+        {/* CTAs */}
+        <div className="fade-up delay-3" style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <button className="btn-primary" onClick={onEnter} style={{ padding: "14px 36px", fontSize: 15 }}>
+            Start your project →
+          </button>
+          <button className="btn-ghost" style={{ padding: "14px 36px", fontSize: 15 }}>
+            See how it works
+          </button>
+        </div>
+      </div>
+    </main>
+
+    {/* Features strip */}
+    <section style={{
+      display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+      borderTop: "1px solid #E8E4DF"
+    }}>
+      {[
+        { icon: "📣", title: "Marketing Agent", desc: "Brand strategy, content creation, social media growth, and visibility campaigns." },
+        { icon: "💰", title: "Finance Agent",   desc: "Pricing models, unit economics, monetization strategies backed by live market data." },
+        { icon: "🧭", title: "Strategy Agent",  desc: "Competitive analysis, roadmaps, business model design, and weekly priorities." },
+      ].map((f, i) => (
+        <div key={i} className={`fade-up delay-${i + 3}`} style={{
+          padding: "40px 48px",
+          borderRight: i < 2 ? "1px solid #E8E4DF" : "none"
+        }}>
+          <div style={{ fontSize: 28, marginBottom: 16 }}>{f.icon}</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, marginBottom: 10 }}>
+            {f.title}
+          </div>
+          <p style={{ fontSize: 14, color: "#6B6560", lineHeight: 1.7, fontWeight: 300 }}>{f.desc}</p>
+        </div>
+      ))}
+    </section>
+  </div>
+);
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SCREEN 2 — DASHBOARD
+════════════════════════════════════════════════════════════════════════════ */
+const DashboardScreen = ({ onNew, onSelect, projects, loading }) => (
+  <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", flexDirection: "column" }}>
+
+    {/* Top nav */}
+    <nav style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      padding: "20px 5%", borderBottom: "1px solid #E8E4DF", background: "#fff"
+    }}>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 500 }}>
+        Mind<span style={{ color: "#C9A96E" }}>All</span>
+      </div>
+      <button className="btn-primary" onClick={onNew} style={{ padding: "10px 24px", fontSize: 13 }}>
+        + New Project
+      </button>
+    </nav>
+
+    <div className="dashboard-body" style={{ flex: 1, width: "100%", padding: "48px 5%" }}>
+
+      {/* Page title */}
+      <div className="fade-up" style={{ marginBottom: 48 }}>
+        <p style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "#C9A96E", marginBottom: 10 }}>
+          Your workspace
+        </p>
+        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 42, fontWeight: 400, lineHeight: 1 }}>
+          Projects
+        </h1>
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div style={{ textAlign: "center", padding: 80, color: "#B8B0A8", fontSize: 14 }}>
+          Loading projects…
+        </div>
+      )}
+
+      {/* Empty state — full width */}
+      {!loading && projects.length === 0 && (
+        <div className="fade-in" style={{
+          width: "100%", border: "1px dashed #D8D3CC",
+          padding: "100px 48px", textAlign: "center", background: "#fff"
+        }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: "50%", background: "#F5F2EE",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 28, margin: "0 auto 28px"
+          }}>🚀</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 400, marginBottom: 14 }}>
+            No projects yet
+          </h2>
+          <p style={{ color: "#8A837C", fontSize: 15, fontWeight: 300, maxWidth: 400, margin: "0 auto 36px", lineHeight: 1.7 }}>
+            Create your first project and let your AI copilot guide you from idea to execution.
+          </p>
+          <button className="btn-primary" onClick={onNew} style={{ padding: "14px 36px", fontSize: 15 }}>
+            Create your first project →
+          </button>
+        </div>
+      )}
+
+      {/* Project grid */}
+      {!loading && projects.length > 0 && (
+        <div className="projects-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
+          {projects.map((p, i) => (
+            <div
+              key={p.id}
+              className={`card fade-up delay-${Math.min(i + 1, 5)}`}
+              onClick={() => onSelect(p)}
+              style={{ padding: "32px 32px 28px", cursor: "pointer" }}
+            >
+              <div style={{
+                display: "inline-block", padding: "3px 10px",
+                background: "#F5F2EE", fontSize: 11, fontWeight: 500,
+                letterSpacing: "0.05em", textTransform: "uppercase",
+                color: "#8A837C", marginBottom: 18
+              }}>
+                {p.industry}
+              </div>
+
+              <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 500, marginBottom: 12, lineHeight: 1.3 }}>
+                {p.title}
+              </h3>
+
+              <p style={{ fontSize: 13, color: "#8A837C", lineHeight: 1.7, marginBottom: 24, fontWeight: 300 }}>
+                {p.description?.slice(0, 100)}{p.description?.length > 100 ? "…" : ""}
+              </p>
+
+              <div style={{ display: "flex", gap: 6, alignItems: "center", paddingTop: 16, borderTop: "1px solid #F0EDE8" }}>
+                {["vision", "target_market", "business_model", "main_challenges"].map(field => (
+                  <div key={field} style={{
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: p[field] ? "#C9A96E" : "#E0DBD4"
+                  }} title={field} />
+                ))}
+                <span style={{ fontSize: 11, color: "#B8B0A8", marginLeft: 6 }}>
+                  {["vision","target_market","business_model","main_challenges"].filter(f => p[f]).length}/4 profiled
+                </span>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "#C9A96E", fontWeight: 500 }}>
+                  Open →
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SCREEN 3 — CREATE + ONBOARDING
+════════════════════════════════════════════════════════════════════════════ */
+const OnboardingScreen = ({ onDone, onBack }) => {
+  const [step, setStep] = useState(1); // 1 = basic, 2 = context
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [projectId, setProjectId] = useState(null);
+
+  const [basic, setBasic] = useState({ title: "", industry: "", description: "" });
+  const [context, setContext] = useState({
+    vision: "", target_market: "", value_proposition: "",
+    business_model: "", main_challenges: "", priorities: ""
+  });
+
+  const handleBasicSubmit = async () => {
+    if (!basic.title || !basic.industry || !basic.description) {
+      setError("Please fill in all fields."); return;
+    }
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`${API}/projects`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(basic)
+      });
+      const data = await res.json();
+      setProjectId(data.id);
+      setStep(2);
+    } catch { setError("Could not connect to backend. Is it running?"); }
+    finally { setLoading(false); }
+  };
+
+  const handleContextSubmit = async () => {
+    setLoading(true); setError("");
+    try {
+      const payload = { ...context };
+      // Convert comma-separated priorities to array
+      if (payload.priorities) {
+        payload.priorities = payload.priorities.split(",").map(s => s.trim()).filter(Boolean);
+      } else {
+        delete payload.priorities;
+      }
+      // Remove empty fields
+      Object.keys(payload).forEach(k => !payload[k] && delete payload[k]);
+
+      await fetch(`${API}/projects/${projectId}/onboarding`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      onDone(projectId);
+    } catch { setError("Failed to save context."); }
+    finally { setLoading(false); }
+  };
+
+  const stepLabel = ["", "Basic Info", "Project Context"];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 620 }}>
+
+        {/* Back */}
+        <button onClick={onBack} style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "#8A837C", fontSize: 13, marginBottom: 32, display: "flex", alignItems: "center", gap: 6
+        }}>
+          ← Back to projects
+        </button>
+
+        {/* Progress */}
+        <div className="fade-up" style={{ marginBottom: 40 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+            {[1, 2].map(s => (
+              <div key={s} style={{
+                flex: 1, height: 3, background: s <= step ? "#1A1A1A" : "#E0DBD4",
+                transition: "background 0.3s"
+              }} />
+            ))}
+          </div>
+          <p style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "#C9A96E", marginBottom: 8 }}>
+            Step {step} of 2
+          </p>
+          <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 400 }}>
+            {stepLabel[step]}
+          </h1>
+        </div>
+
+        <div className="card fade-up delay-1" style={{ padding: 36 }}>
+
+          {/* Step 1 */}
+          {step === 1 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                  Project Name *
+                </label>
+                <input className="input-field" placeholder="e.g. Premium Coffee Subscription"
+                  value={basic.title} onChange={e => setBasic({ ...basic, title: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                  Industry *
+                </label>
+                <input className="input-field" placeholder="e.g. Food & Beverage, SaaS, Healthcare..."
+                  value={basic.industry} onChange={e => setBasic({ ...basic, industry: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                  What are you building? *
+                </label>
+                <textarea className="input-field" placeholder="Describe your product or service in a few sentences..."
+                  rows={4} style={{ resize: "vertical" }}
+                  value={basic.description} onChange={e => setBasic({ ...basic, description: e.target.value })} />
+              </div>
+              {error && <p style={{ color: "#D94F4F", fontSize: 13 }}>{error}</p>}
+              <button className="btn-primary" onClick={handleBasicSubmit} disabled={loading} style={{ width: "100%", padding: 14 }}>
+                {loading ? "Creating…" : "Continue →"}
+              </button>
+            </div>
+          )}
+
+          {/* Step 2 */}
+          {step === 2 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <p style={{ fontSize: 13, color: "#8A837C", lineHeight: 1.6, marginBottom: 4 }}>
+                The more context you provide, the more personalized and accurate your AI advice will be. All fields are optional.
+              </p>
+              {[
+                { key: "vision",            label: "Your 3-year vision",      placeholder: "Where do you want this to be in 3 years?" },
+                { key: "target_market",     label: "Target Market",           placeholder: "Who is your ideal customer?" },
+                { key: "value_proposition", label: "Value Proposition",       placeholder: "What problem do you uniquely solve?" },
+                { key: "business_model",    label: "Business Model",          placeholder: "How do you make money?" },
+                { key: "main_challenges",   label: "Main Challenges",         placeholder: "What's keeping you up at night?" },
+                { key: "priorities",        label: "Top Priorities (comma-separated)", placeholder: "Launch MVP, Get 10 clients, Build brand..." },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                    {label}
+                  </label>
+                  <input className="input-field" placeholder={placeholder}
+                    value={context[key]} onChange={e => setContext({ ...context, [key]: e.target.value })} />
+                </div>
+              ))}
+              {error && <p style={{ color: "#D94F4F", fontSize: 13 }}>{error}</p>}
+              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                <button className="btn-ghost" onClick={() => onDone(projectId)} style={{ flex: 1, padding: 13 }}>
+                  Skip for now
+                </button>
+                <button className="btn-primary" onClick={handleContextSubmit} disabled={loading} style={{ flex: 2, padding: 13 }}>
+                  {loading ? "Saving…" : "Start chatting →"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SCREEN 4 — CHAT
+════════════════════════════════════════════════════════════════════════════ */
+const ChatScreen = ({ project, onBack }) => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  // Welcome message
+  useEffect(() => {
+    setMessages([{
+      role: "assistant",
+      agent: "strategy",
+      text: `Welcome! I'm your MindAll Copilot for **${project.title}**.\n\nAsk me anything — pricing, marketing strategy, competitive landscape, roadmap priorities. I'll route your question to the right specialist and pull live market data to back up my advice.`
+    }]);
+  }, [project.id]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const sendMessage = async () => {
+    const q = input.trim();
+    if (!q || loading) return;
+    setInput("");
+    setMessages(m => [...m, { role: "user", text: q }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API}/projects/${project.id}/chat`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q })
+      });
+      const data = await res.json();
+      setMessages(m => [...m, { role: "assistant", agent: data.agent_used, text: data.response }]);
+    } catch {
+      setMessages(m => [...m, { role: "assistant", agent: "general", text: "Sorry, I couldn't reach the backend. Please make sure it's running." }]);
+    } finally { setLoading(false); }
+  };
+
+  const suggestions = [
+    "How should I price my offer?",
+    "Who are my main competitors?",
+    "What's my go-to-market strategy?",
+    "How do I build brand awareness?",
+  ];
+
+  return (
+    <div style={{ height: "100vh", width: "100vw", display: "flex", flexDirection: "column", background: "#FAFAF8", overflow: "hidden" }}>
+
+      {/* Header */}
+      <div className="chat-header" style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "14px 5%", borderBottom: "1px solid #E8E4DF",
+        background: "#fff", flexShrink: 0
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+          <button onClick={onBack} style={{
+            background: "none", border: "none", cursor: "pointer", flexShrink: 0,
+            color: "#8A837C", fontSize: 13, display: "flex", alignItems: "center", gap: 4
+          }}>← Back</button>
+          <div style={{ width: 1, height: 20, background: "#E8E4DF", flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {project.title}
+            </div>
+            <div style={{ fontSize: 11, color: "#B8B0A8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              {project.industry}
+            </div>
+          </div>
+        </div>
+        <div className="chat-header-badges" style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <AgentBadge type="marketing" />
+          <AgentBadge type="finance" />
+          <AgentBadge type="strategy" />
+        </div>
+      </div>
+
+      {/* Messages — fills all remaining space */}
+      <div className="chat-messages" style={{ flex: 1, overflowY: "auto", padding: "32px 5%", minHeight: 0 }}>
+        <div style={{ width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+
+          {messages.map((m, i) => (
+            <div key={i} className="fade-in" style={{
+              display: "flex",
+              justifyContent: m.role === "user" ? "flex-end" : "flex-start"
+            }}>
+              {m.role === "assistant" && (
+                <div className="chat-msg-inner" style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: "78%", width: "100%" }}>
+                  <AgentBadge type={m.agent} />
+                  <div className="card" style={{
+                    padding: "20px 24px", fontSize: 14, lineHeight: 1.85,
+                    color: "#2A2A2A", whiteSpace: "pre-wrap", fontWeight: 300
+                  }}>
+                    {m.text}
+                  </div>
+                </div>
+              )}
+              {m.role === "user" && (
+                <div className="chat-user-bubble" style={{
+                  background: "#1A1A1A", color: "#FAFAF8",
+                  padding: "14px 20px", maxWidth: "65%",
+                  fontSize: 14, lineHeight: 1.7, fontWeight: 300
+                }}>
+                  {m.text}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Loading */}
+          {loading && (
+            <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 8, color: "#B8B0A8" }}>
+              <div style={{ display: "flex", gap: 4 }}>
+                {[0, 0.15, 0.3].map((d, i) => (
+                  <div key={i} style={{
+                    width: 7, height: 7, borderRadius: "50%", background: "#C9A96E",
+                    animation: `pulse 1.2s ease-in-out ${d}s infinite`
+                  }} />
+                ))}
+              </div>
+              <span style={{ fontSize: 13 }}>Researching and thinking…</span>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* Suggestions */}
+      {messages.length === 1 && (
+        <div className="suggestions-wrap" style={{ padding: "0 5% 12px", flexShrink: 0 }}>
+          <div style={{ width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {suggestions.map((s, i) => (
+              <button key={i} onClick={() => setInput(s)} style={{
+                background: "#fff", border: "1px solid #E0DBD4",
+                padding: "8px 16px", fontSize: 13, cursor: "pointer", color: "#4A4540",
+                fontFamily: "'DM Sans', sans-serif", transition: "border-color 0.2s, background 0.2s"
+              }}
+                onMouseEnter={e => { e.target.style.borderColor = "#C9A96E"; e.target.style.background = "#FFFAF5"; }}
+                onMouseLeave={e => { e.target.style.borderColor = "#E0DBD4"; e.target.style.background = "#fff"; }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input bar */}
+      <div className="chat-input-bar" style={{
+        padding: "16px 5% 20px", borderTop: "1px solid #E8E4DF",
+        background: "#fff", flexShrink: 0
+      }}>
+        <div style={{ width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", gap: 12 }}>
+          <input
+            className="input-field"
+            placeholder="Ask your copilot anything about your business…"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+            disabled={loading}
+            style={{ flex: 1, fontSize: 14 }}
+          />
+          <button
+            className="btn-primary"
+            onClick={sendMessage}
+            disabled={loading || !input.trim()}
+            style={{ padding: "12px 28px", opacity: loading || !input.trim() ? 0.4 : 1, flexShrink: 0 }}
+          >
+            Send
+          </button>
+        </div>
+        <p style={{ textAlign: "center", fontSize: 11, color: "#C8C2BC", marginTop: 10, letterSpacing: "0.03em" }}>
+          Powered by MindAll AI · Routed automatically to Marketing, Finance, or Strategy agent
+        </p>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   APP ROUTER
+════════════════════════════════════════════════════════════════════════════ */
+export default function App() {
+  const [screen, setScreen] = useState("landing");  // landing | dashboard | onboarding | chat
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [activeProject, setActiveProject] = useState(null);
+
+  const loadProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const res = await fetch(`${API}/projects`);
+      const data = await res.json();
+      setProjects(Array.isArray(data) ? data : []);
+    } catch { setProjects([]); }
+    finally { setLoadingProjects(false); }
+  };
+
+  const goToDashboard = () => {
+    loadProjects();
+    setScreen("dashboard");
+  };
+
+  return (
+    <>
+      {screen === "landing" && (
+        <LandingScreen onEnter={goToDashboard} />
+      )}
+
+      {screen === "dashboard" && (
+        <DashboardScreen
+          projects={projects}
+          loading={loadingProjects}
+          onNew={() => setScreen("onboarding")}
+          onSelect={p => { setActiveProject(p); setScreen("chat"); }}
+        />
+      )}
+
+      {screen === "onboarding" && (
+        <OnboardingScreen
+          onBack={() => setScreen("dashboard")}
+          onDone={async (projectId) => {
+            await loadProjects();
+            // Load the full project then go to chat
+            try {
+              const res = await fetch(`${API}/projects/${projectId}`);
+              const p = await res.json();
+              setActiveProject(p);
+            } catch { /* fallback */ }
+            setScreen("chat");
+          }}
+        />
+      )}
+
+      {screen === "chat" && activeProject && (
+        <ChatScreen
+          project={activeProject}
+          onBack={goToDashboard}
+        />
+      )}
+    </>
+  );
+}

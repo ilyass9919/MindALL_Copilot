@@ -5,10 +5,9 @@ from app.core.config import settings
 class MindAllAIService:
     def __init__(self):
         self.llm = ChatOpenAI(
-            # GitHub Models are OpenAI-compatible!
             api_key=settings.OPENAI_API_KEY, 
             base_url=settings.OPENAI_BASE_URL, 
-            model="gpt-4o-mini", # You can also use "meta-llama-3-70b-instruct" here!
+            model="gpt-4o-mini", # You can also use "meta-llama-3-70b-instruct"
             temperature=0.7
         )
     

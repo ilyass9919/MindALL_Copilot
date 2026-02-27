@@ -15,7 +15,7 @@ class ChromaMemoryStore:
         # Persistent client: saves to disk automatically
         self.client = chromadb.PersistentClient(path="./chroma_db")
 
-        # Use OpenAI embeddings (same model, compatible with your Azure endpoint)
+        # Use OpenAI embeddings for vectorization
         self.embed_fn = embedding_functions.OpenAIEmbeddingFunction(
             api_key=settings.OPENAI_API_KEY,
             api_base=settings.OPENAI_BASE_URL,
