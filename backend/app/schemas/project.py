@@ -10,16 +10,13 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectOnboarding(BaseModel):
-    """
-    Used to fill in the entrepreneur's full context after creation.
-    All fields optional so the user can update progressively.
-    """
+    """Enrich the project with full entrepreneur context."""
     vision: Optional[str] = Field(None, example="Become the #1 premium coffee brand for Gen Z in Europe")
     target_market: Optional[str] = Field(None, example="Gen Z, 18-28, urban, coffee enthusiasts")
-    value_proposition: Optional[str] = Field(None, example="Specialty coffee delivered to your door, curated for taste explorers")
-    business_model: Optional[str] = Field(None, example="Monthly subscription, $22/month, 3 bag sizes")
-    main_challenges: Optional[str] = Field(None, example="Low brand awareness, tight margins, customer retention")
-    priorities: Optional[List[str]] = Field(None, example=["Launch MVP", "Get first 10 subscribers", "Build Instagram presence"])
+    value_proposition: Optional[str] = Field(None, example="Specialty coffee delivered to your door")
+    business_model: Optional[str] = Field(None, example="Monthly subscription, $22/month")
+    main_challenges: Optional[str] = Field(None, example="Low brand awareness, tight margins")
+    priorities: Optional[List[str]] = Field(None, example=["Launch MVP", "Get first 10 subscribers"])
 
 
 class ProjectResponse(BaseModel):
@@ -38,3 +35,4 @@ class ProjectResponse(BaseModel):
 
     class Config:
         from_attributes = True
+

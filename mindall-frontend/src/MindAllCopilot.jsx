@@ -2,6 +2,73 @@ import { useState, useEffect, useRef } from "react";
 
 const API = "http://127.0.0.1:8000";
 
+/* ── Auth helpers ─────────────────────────────────────────────────────────── */
+const getToken = () => sessionStorage.getItem("mindall_token");
+const getUser  = () => { try { return JSON.parse(sessionStorage.getItem("mindall_user")); } catch { return null; } };
+const setAuth  = (token, user) => { sessionStorage.setItem("mindall_token", token); sessionStorage.setItem("mindall_user", JSON.stringify(user)); };
+const clearAuth = () => { sessionStorage.removeItem("mindall_token"); sessionStorage.removeItem("mindall_user"); };
+/* ── Simple Markdown Renderer ─────────────────────────────────────────────── */
+const renderMarkdown = (text) => {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const elements = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Empty line → spacer
+    if (line.trim() === "") {
+      elements.push(<div key={i} style={{ height: 8 }} />);
+      i++; continue;
+    }
+    // ### Heading 3
+    if (line.startsWith("### ")) {
+      elements.push(<div key={i} style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, fontWeight: 600, color: "#1A1A1A", marginTop: 16, marginBottom: 4 }}>{line.replace("### ", "")}</div>);
+      i++; continue;
+    }
+    // ## Heading 2
+    if (line.startsWith("## ")) {
+      elements.push(<div key={i} style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: "#1A1A1A", marginTop: 18, marginBottom: 6 }}>{line.replace("## ", "")}</div>);
+      i++; continue;
+    }
+    // # Heading 1
+    if (line.startsWith("# ")) {
+      elements.push(<div key={i} style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 500, color: "#1A1A1A", marginTop: 20, marginBottom: 8 }}>{line.replace("# ", "")}</div>);
+      i++; continue;
+    }
+    // - bullet point
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      const bulletLines = [];
+      while (i < lines.length && (lines[i].startsWith("- ") || lines[i].startsWith("* "))) {
+        bulletLines.push(lines[i].replace(/^[-*] /, ""));
+        i++;
+      }
+      elements.push(
+        <ul key={i} style={{ paddingLeft: 20, margin: "6px 0", display: "flex", flexDirection: "column", gap: 4 }}>
+          {bulletLines.map((b, bi) => (
+            <li key={bi} style={{ fontSize: 14, lineHeight: 1.7, color: "#2A2A2A" }}
+              dangerouslySetInnerHTML={{ __html: b.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\*(.*?)\*/g, "<em>$1</em>") }}
+            />
+          ))}
+        </ul>
+      );
+      continue;
+    }
+    // Normal paragraph with inline bold/italic
+    elements.push(
+      <p key={i} style={{ fontSize: 14, lineHeight: 1.85, color: "#2A2A2A", margin: "2px 0" }}
+        dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\*(.*?)\*/g, "<em>$1</em>") }}
+      />
+    );
+    i++;
+  }
+  return elements;
+};
+
+
+const authHeaders = () => ({ "Content-Type": "application/json", "Authorization": `Bearer ${getToken()}` });
+
 /* ── Google Fonts ─────────────────────────────────────────────────────────── */
 const fontLink = document.createElement("link");
 fontLink.rel = "stylesheet";
@@ -12,7 +79,8 @@ document.head.appendChild(fontLink);
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: #FAFAF8; color: #1A1A1A; }
+  html, body, #root { width: 100%; min-height: 100vh; }
+  body { font-family: 'DM Sans', sans-serif; background: #FAFAF8; color: #1A1A1A; overflow-x: hidden; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: #F0EDE8; }
   ::-webkit-scrollbar-thumb { background: #C9A96E; border-radius: 2px; }
@@ -99,30 +167,177 @@ globalStyle.textContent = `
 `;
 document.head.appendChild(globalStyle);
 
-/* ── Agent badge ──────────────────────────────────────────────────────────── */
+/* ── Agent SVG Icons ──────────────────────────────────────────────────────── */
+
+// Marketing: Megaphone — clear, professional, universally understood
+const MarketingIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+  </svg>
+);
+
+// Finance: Trending up chart — instantly signals growth & financial performance  
+const FinanceIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+    <polyline points="17 6 23 6 23 12"/>
+  </svg>
+);
+
+// Strategy: Layers — represents planning, structure, and strategic depth
+const StrategyIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+    <polyline points="2 17 12 22 22 17"/>
+    <polyline points="2 12 12 17 22 12"/>
+  </svg>
+);
+
+// General: Sparkle — AI-generated insight
+const GeneralIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 8v4l3 3"/>
+  </svg>
+);
+
 const AgentBadge = ({ type }) => {
   const map = {
-    marketing: { label: "Marketing", icon: "📣", cls: "tag-marketing" },
-    finance:   { label: "Finance",   icon: "💰", cls: "tag-finance"   },
-    strategy:  { label: "Strategy",  icon: "🧭", cls: "tag-strategy"  },
+    marketing: { label: "Marketing", Icon: MarketingIcon, cls: "tag-marketing" },
+    finance:   { label: "Finance",   Icon: FinanceIcon,   cls: "tag-finance"   },
+    strategy:  { label: "Strategy",  Icon: StrategyIcon,  cls: "tag-strategy"  },
   };
-  const a = map[type] || { label: type, icon: "🤖", cls: "tag-general" };
+  const a = map[type] || { label: type, Icon: GeneralIcon, cls: "tag-general" };
   return (
     <span className={a.cls} style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "3px 10px", fontSize: 11, fontWeight: 500,
-      letterSpacing: "0.04em", textTransform: "uppercase"
+      display: "inline-flex", alignItems: "center", gap: 5,
+      padding: "4px 10px", fontSize: 11, fontWeight: 500,
+      letterSpacing: "0.05em", textTransform: "uppercase"
     }}>
-      {a.icon} {a.label}
+      <a.Icon /> {a.label}
     </span>
+  );
+};
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AUTH SCREEN — LOGIN + SIGNUP
+════════════════════════════════════════════════════════════════════════════ */
+const AuthScreen = ({ onSuccess }) => {
+  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    if (!form.email || !form.password || (mode === "signup" && !form.name)) {
+      setError("Please fill in all fields."); return;
+    }
+    setLoading(true); setError("");
+    try {
+      const endpoint = mode === "signup" ? "/auth/register" : "/auth/login";
+      const body = mode === "signup"
+        ? { name: form.name, email: form.email, password: form.password }
+        : { email: form.email, password: form.password };
+
+      const res = await fetch(`${API}${endpoint}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.detail || "Something went wrong."); return; }
+
+      setAuth(data.access_token, data.user);
+      onSuccess(data.user);
+    } catch { setError("Cannot connect to backend. Is it running?"); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", width: "100vw", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 480 }}>
+
+        {/* Logo */}
+        <div className="fade-up" style={{ textAlign: "center", marginBottom: 48 }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 500, letterSpacing: "0.02em", marginBottom: 8 }}>
+            Mind<span style={{ color: "#C9A96E" }}>All</span>
+          </div>
+          <p style={{ fontSize: 14, color: "#8A837C", fontWeight: 300 }}>
+            Your AI-powered entrepreneur copilot
+          </p>
+        </div>
+
+        <div className="card fade-up delay-1" style={{ padding: "40px 40px" }}>
+
+          {/* Tab switcher */}
+          <div style={{ display: "flex", borderBottom: "1px solid #E8E4DF", marginBottom: 32 }}>
+            {["login", "signup"].map(m => (
+              <button key={m} onClick={() => { setMode(m); setError(""); }} style={{
+                flex: 1, padding: "10px 0", background: "none", border: "none",
+                cursor: "pointer", fontSize: 14, fontWeight: mode === m ? 500 : 400,
+                color: mode === m ? "#1A1A1A" : "#B8B0A8",
+                borderBottom: mode === m ? "2px solid #C9A96E" : "2px solid transparent",
+                fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.02em",
+                transition: "all 0.2s", marginBottom: -1, textTransform: "capitalize"
+              }}>
+                {m === "login" ? "Sign In" : "Create Account"}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {mode === "signup" && (
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                  Full Name
+                </label>
+                <input className="input-field" placeholder="Your name"
+                  value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                Email
+              </label>
+              <input className="input-field" type="email" placeholder="you@example.com"
+                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+                onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A837C", marginBottom: 8 }}>
+                Password
+              </label>
+              <input className="input-field" type="password" placeholder="••••••••"
+                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+            </div>
+
+            {error && (
+              <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", fontSize: 13, color: "#DC2626" }}>
+                {error}
+              </div>
+            )}
+
+            <button className="btn-primary" onClick={handleSubmit} disabled={loading}
+              style={{ width: "100%", padding: 14, marginTop: 4, fontSize: 15 }}>
+              {loading ? "Please wait…" : mode === "login" ? "Sign In →" : "Create Account →"}
+            </button>
+          </div>
+        </div>
+
+        <p className="fade-up delay-2" style={{ textAlign: "center", fontSize: 12, color: "#C0BAB4", marginTop: 24 }}>
+          Your projects and conversations are private to your account
+        </p>
+      </div>
+    </div>
   );
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
    SCREEN 1 — LANDING
 ════════════════════════════════════════════════════════════════════════════ */
-const LandingScreen = ({ onEnter }) => (
-  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+const LandingScreen = ({ onEnter, user, onLogout }) => (
+  <div style={{ minHeight: "100vh", width: "100vw", display: "flex", flexDirection: "column" }}>
 
     {/* Nav */}
     <nav style={{
@@ -132,9 +347,13 @@ const LandingScreen = ({ onEnter }) => (
       <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 500, letterSpacing: "0.02em" }}>
         Mind<span style={{ color: "#C9A96E" }}>All</span>
       </div>
-      <button className="btn-primary" onClick={onEnter} style={{ padding: "10px 24px", fontSize: 13 }}>
-        Launch Copilot →
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {user && <span style={{ fontSize: 13, color: "#8A837C" }}>Hi, {user.name}</span>}
+        <button className="btn-primary" onClick={onEnter} style={{ padding: "10px 24px", fontSize: 13 }}>
+          Launch Copilot →
+        </button>
+        {user && <button className="btn-ghost" onClick={onLogout} style={{ padding: "9px 16px", fontSize: 13 }}>Sign out</button>}
+      </div>
     </nav>
 
     {/* Hero */}
@@ -192,15 +411,40 @@ const LandingScreen = ({ onEnter }) => (
       borderTop: "1px solid #E8E4DF"
     }}>
       {[
-        { icon: "📣", title: "Marketing Agent", desc: "Brand strategy, content creation, social media growth, and visibility campaigns." },
-        { icon: "💰", title: "Finance Agent",   desc: "Pricing models, unit economics, monetization strategies backed by live market data." },
-        { icon: "🧭", title: "Strategy Agent",  desc: "Competitive analysis, roadmaps, business model design, and weekly priorities." },
+        { icon: "marketing", title: "Marketing Agent", desc: "Brand strategy, content creation, social media growth, and visibility campaigns." },
+        { icon: "finance",   title: "Finance Agent",   desc: "Pricing models, unit economics, monetization strategies backed by live market data." },
+        { icon: "strategy",  title: "Strategy Agent",  desc: "Competitive analysis, roadmaps, business model design, and weekly priorities." },
       ].map((f, i) => (
         <div key={i} className={`fade-up delay-${i + 3}`} style={{
           padding: "40px 48px",
           borderRight: i < 2 ? "1px solid #E8E4DF" : "none"
         }}>
-          <div style={{ fontSize: 28, marginBottom: 16 }}>{f.icon}</div>
+          <div style={{
+            width: 48, height: 48, marginBottom: 22,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            borderRadius: "12px",
+            background: f.icon === "marketing" ? "#FFF3E8" : f.icon === "finance" ? "#E8F5F0" : "#EEF0FF",
+            color: f.icon === "marketing" ? "#C97A2A" : f.icon === "finance" ? "#2A9A70" : "#4A5FBF",
+          }}>
+            {f.icon === "marketing" && (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+              </svg>
+            )}
+            {f.icon === "finance" && (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+              </svg>
+            )}
+            {f.icon === "strategy" && (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
+            )}
+          </div>
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, marginBottom: 10 }}>
             {f.title}
           </div>
@@ -214,8 +458,25 @@ const LandingScreen = ({ onEnter }) => (
 /* ════════════════════════════════════════════════════════════════════════════
    SCREEN 2 — DASHBOARD
 ════════════════════════════════════════════════════════════════════════════ */
-const DashboardScreen = ({ onNew, onSelect, projects, loading }) => (
-  <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", flexDirection: "column" }}>
+const DashboardScreen = ({ onNew, onSelect, projects, loading, user, onLogout, openingProject }) => (
+  <div style={{ minHeight: "100vh", width: "100vw", background: "#FAFAF8", display: "flex", flexDirection: "column", position: "relative" }}>
+    {openingProject && (
+      <div style={{
+        position: "fixed", inset: 0, background: "rgba(250,250,248,0.85)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        zIndex: 50, backdropFilter: "blur(4px)"
+      }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          {[0, 0.15, 0.3].map((d, i) => (
+            <div key={i} style={{
+              width: 10, height: 10, borderRadius: "50%", background: "#C9A96E",
+              animation: `pulse 1.2s ease-in-out ${d}s infinite`
+            }} />
+          ))}
+        </div>
+        <p style={{ fontSize: 14, color: "#8A837C", fontFamily: "'DM Sans', sans-serif" }}>Opening project…</p>
+      </div>
+    )}
 
     {/* Top nav */}
     <nav style={{
@@ -225,9 +486,11 @@ const DashboardScreen = ({ onNew, onSelect, projects, loading }) => (
       <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 500 }}>
         Mind<span style={{ color: "#C9A96E" }}>All</span>
       </div>
-      <button className="btn-primary" onClick={onNew} style={{ padding: "10px 24px", fontSize: 13 }}>
-        + New Project
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {user && <span style={{ fontSize: 13, color: "#8A837C" }}>Hi, {user.name}</span>}
+        <button className="btn-primary" onClick={onNew} style={{ padding: "10px 24px", fontSize: 13 }}>+ New Project</button>
+        {user && <button className="btn-ghost" onClick={onLogout} style={{ padding: "9px 16px", fontSize: 13 }}>Sign out</button>}
+      </div>
     </nav>
 
     <div className="dashboard-body" style={{ flex: 1, width: "100%", padding: "48px 5%" }}>
@@ -344,6 +607,7 @@ const OnboardingScreen = ({ onDone, onBack }) => {
     try {
       const res = await fetch(`${API}/projects`, {
         method: "POST", headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getToken()}` },
         body: JSON.stringify(basic)
       });
       const data = await res.json();
@@ -367,7 +631,7 @@ const OnboardingScreen = ({ onDone, onBack }) => {
       Object.keys(payload).forEach(k => !payload[k] && delete payload[k]);
 
       await fetch(`${API}/projects/${projectId}/onboarding`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: authHeaders(),
         body: JSON.stringify(payload)
       });
       onDone(projectId);
@@ -378,7 +642,7 @@ const OnboardingScreen = ({ onDone, onBack }) => {
   const stepLabel = ["", "Basic Info", "Project Context"];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+    <div style={{ minHeight: "100vh", width: "100vw", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 620 }}>
 
         {/* Back */}
@@ -487,15 +751,45 @@ const ChatScreen = ({ project, onBack }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const bottomRef = useRef(null);
 
-  // Welcome message
+  // Load chat history on mount
   useEffect(() => {
-    setMessages([{
-      role: "assistant",
-      agent: "strategy",
-      text: `Welcome! I'm your MindAll Copilot for **${project.title}**.\n\nAsk me anything — pricing, marketing strategy, competitive landscape, roadmap priorities. I'll route your question to the right specialist and pull live market data to back up my advice.`
-    }]);
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      try {
+        const res = await fetch(`${API}/projects/${project.id}/messages`, {
+          headers: authHeaders()
+        });
+        const data = await res.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+          // Restore past conversation
+          setMessages(data.map(m => ({
+            role: m.role,
+            agent: m.agent_type || "strategy",
+            text: m.content
+          })));
+        } else {
+          // First time — show welcome message
+          setMessages([{
+            role: "assistant",
+            agent: "strategy",
+            text: `Welcome! I'm your MindAll Copilot for **${project.title}**.\n\nAsk me anything — pricing, marketing strategy, competitive landscape, roadmap priorities. I'll route your question to the right specialist and pull live market data to back up my advice.`
+          }]);
+        }
+      } catch {
+        setMessages([{
+          role: "assistant",
+          agent: "strategy",
+          text: `Welcome! I'm your MindAll Copilot for **${project.title}**.\n\nAsk me anything — pricing, marketing strategy, competitive landscape, or roadmap priorities.`
+        }]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    loadHistory();
   }, [project.id]);
 
   useEffect(() => {
@@ -511,7 +805,7 @@ const ChatScreen = ({ project, onBack }) => {
 
     try {
       const res = await fetch(`${API}/projects/${project.id}/chat`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: authHeaders(),
         body: JSON.stringify({ query: q })
       });
       const data = await res.json();
@@ -563,7 +857,23 @@ const ChatScreen = ({ project, onBack }) => {
       <div className="chat-messages" style={{ flex: 1, overflowY: "auto", padding: "32px 5%", minHeight: 0 }}>
         <div style={{ width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
 
-          {messages.map((m, i) => (
+          {/* History loading skeleton */}
+          {loadingHistory && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{
+                  height: i === 2 ? 80 : 48,
+                  width: i === 2 ? "65%" : "75%",
+                  alignSelf: i === 2 ? "flex-end" : "flex-start",
+                  background: "linear-gradient(90deg, #F0EDE8 25%, #FAF8F5 50%, #F0EDE8 75%)",
+                  backgroundSize: "200% 100%",
+                  animation: "shimmer 1.5s infinite"
+                }} />
+              ))}
+            </div>
+          )}
+
+          {!loadingHistory && messages.map((m, i) => (
             <div key={i} className="fade-in" style={{
               display: "flex",
               justifyContent: m.role === "user" ? "flex-end" : "flex-start"
@@ -573,9 +883,9 @@ const ChatScreen = ({ project, onBack }) => {
                   <AgentBadge type={m.agent} />
                   <div className="card" style={{
                     padding: "20px 24px", fontSize: 14, lineHeight: 1.85,
-                    color: "#2A2A2A", whiteSpace: "pre-wrap", fontWeight: 300
+                    color: "#2A2A2A", fontWeight: 300
                   }}>
-                    {m.text}
+                    {renderMarkdown(m.text)}
                   </div>
                 </div>
               )}
@@ -610,7 +920,7 @@ const ChatScreen = ({ project, onBack }) => {
       </div>
 
       {/* Suggestions */}
-      {messages.length === 1 && (
+      {messages.length === 1 && !loadingHistory && (
         <div className="suggestions-wrap" style={{ padding: "0 5% 12px", flexShrink: 0 }}>
           <div style={{ width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
             {suggestions.map((s, i) => (
@@ -665,19 +975,29 @@ const ChatScreen = ({ project, onBack }) => {
    APP ROUTER
 ════════════════════════════════════════════════════════════════════════════ */
 export default function App() {
-  const [screen, setScreen] = useState("landing");  // landing | dashboard | onboarding | chat
+  const [screen, setScreen] = useState("landing");
+  const [user, setUser] = useState(getUser);  // restore from session
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [activeProject, setActiveProject] = useState(null);
+  const [openingProject, setOpeningProject] = useState(false);
 
   const loadProjects = async () => {
     setLoadingProjects(true);
     try {
-      const res = await fetch(`${API}/projects`);
+      const res = await fetch(`${API}/projects`, { headers: authHeaders() });
+      if (res.status === 401) { handleLogout(); return; }
       const data = await res.json();
       setProjects(Array.isArray(data) ? data : []);
     } catch { setProjects([]); }
     finally { setLoadingProjects(false); }
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    setUser(null);
+    setScreen("auth");
+    setProjects([]);
   };
 
   const goToDashboard = () => {
@@ -685,18 +1005,43 @@ export default function App() {
     setScreen("dashboard");
   };
 
+  // On mount: if user is already logged in skip auth
+  useEffect(() => {
+    if (user && getToken()) {
+      setScreen("landing");
+    } else {
+      setScreen("auth");
+    }
+  }, []);
+
   return (
     <>
+      {screen === "auth" && (
+        <AuthScreen onSuccess={u => { setUser(u); setScreen("landing"); }} />
+      )}
+
       {screen === "landing" && (
-        <LandingScreen onEnter={goToDashboard} />
+        <LandingScreen onEnter={goToDashboard} user={user} onLogout={handleLogout} />
       )}
 
       {screen === "dashboard" && (
         <DashboardScreen
           projects={projects}
           loading={loadingProjects}
+          user={user}
           onNew={() => setScreen("onboarding")}
-          onSelect={p => { setActiveProject(p); setScreen("chat"); }}
+          onSelect={async (p) => {
+            setOpeningProject(true);
+            try {
+              const res = await fetch(`${API}/projects/${p.id}`, { headers: authHeaders() });
+              const fresh = await res.json();
+              setActiveProject(fresh);
+            } catch { setActiveProject(p); }
+            finally { setOpeningProject(false); }
+            setScreen("chat");
+          }}
+          openingProject={openingProject}
+          onLogout={handleLogout}
         />
       )}
 
@@ -705,12 +1050,11 @@ export default function App() {
           onBack={() => setScreen("dashboard")}
           onDone={async (projectId) => {
             await loadProjects();
-            // Load the full project then go to chat
             try {
-              const res = await fetch(`${API}/projects/${projectId}`);
+              const res = await fetch(`${API}/projects/${projectId}`, { headers: authHeaders() });
               const p = await res.json();
               setActiveProject(p);
-            } catch { /* fallback */ }
+            } catch { }
             setScreen("chat");
           }}
         />
@@ -719,7 +1063,9 @@ export default function App() {
       {screen === "chat" && activeProject && (
         <ChatScreen
           project={activeProject}
+          user={user}
           onBack={goToDashboard}
+          onLogout={handleLogout}
         />
       )}
     </>

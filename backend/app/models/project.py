@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, JSON
+from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -7,19 +8,27 @@ class Project(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # Owner
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner = relationship("User", back_populates="projects")
+
     # Basic info
     title = Column(String, index=True)
     industry = Column(String)
     description = Column(Text)
 
-    # ── Onboarding fields
-    vision = Column(Text, nullable=True)            # "Where do you want to be in 3 years?"
-    target_market = Column(Text, nullable=True)     # "Who is your ideal customer?"
-    value_proposition = Column(Text, nullable=True) # "What problem do you solve?"
-    business_model = Column(Text, nullable=True)    # "How do you make money?"
-    main_challenges = Column(Text, nullable=True)   # "What are your top 3 challenges?"
-    priorities = Column(JSON, nullable=True)        # ["Launch MVP", "Find first 10 clients", ...]
+    # Onboarding
+    vision = Column(Text, nullable=True)
+    target_market = Column(Text, nullable=True)
+    value_proposition = Column(Text, nullable=True)
+    business_model = Column(Text, nullable=True)
+    main_challenges = Column(Text, nullable=True)
+    priorities = Column(JSON, nullable=True)
 
     # AI output
     ai_analysis = Column(Text, nullable=True)
 
+    # Chat history
+    messages = relationship("ChatMessage", back_populates="project", 
+                           cascade="all, delete-orphan",
+                           order_by="ChatMessage.created_at")
