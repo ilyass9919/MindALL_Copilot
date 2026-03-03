@@ -12,10 +12,10 @@ class ChromaMemoryStore:
     """
 
     def __init__(self):
-        # Persistent client: saves to disk automatically
+        # Persistent client that saves data to disk
         self.client = chromadb.PersistentClient(path="./chroma_db")
 
-        # Use OpenAI embeddings for vectorization
+        # OpenAI embeddings for vectorization
         self.embed_fn = embedding_functions.OpenAIEmbeddingFunction(
             api_key=settings.OPENAI_API_KEY,
             api_base=settings.OPENAI_BASE_URL,

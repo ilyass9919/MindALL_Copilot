@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # JWT
-    JWT_SECRET: str = "change-this-in-production-please"
+    JWT_SECRET: str = "we-should-change-this-to-a-secure-random-string"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 48
 

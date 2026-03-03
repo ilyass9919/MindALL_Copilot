@@ -39,7 +39,7 @@ class BaseAgent(ABC):
         return self.search_query_template.format(query=query, industry=industry)
 
     def execute(self, query: str, project_context: str, memory_context: str) -> str:
-        # Step 1: Web search
+        # Web search
         web_context = "No web search performed."
         search_query = self._build_search_query(query, project_context)
         if search_query:
@@ -48,7 +48,7 @@ class BaseAgent(ABC):
             except Exception as e:
                 web_context = f"Web search unavailable: {str(e)}"
 
-        # Step 2: Prompt with all context layers
+        # Prompt with all context layers
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             ("human", (

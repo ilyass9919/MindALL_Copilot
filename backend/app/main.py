@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
 
-# ─── Schemas ─────────────────────────────────────────────────────────────────
+# Schemas 
 
 class AIAnalysisResponse(BaseModel):
     analysis: str
@@ -56,14 +56,14 @@ class MessageResponse(BaseModel):
         from_attributes = True
 
 
-# ─── System ──────────────────────────────────────────────────────────────────
+# System 
 
 @app.get("/health", tags=["System"])
 async def health_check():
     return {"status": "online", "project": settings.PROJECT_NAME}
 
 
-# ─── Auth ─────────────────────────────────────────────────────────────────────
+# Auth 
 
 @app.post("/auth/register", response_model=TokenResponse, tags=["Auth"])
 def register(data: UserRegister, db: Session = Depends(get_db)):
@@ -108,7 +108,7 @@ def get_me(current_user: UserModel = Depends(get_current_user)):
     return current_user
 
 
-# ─── Projects (all protected) ─────────────────────────────────────────────────
+# Projects 
 
 @app.post("/projects", response_model=ProjectResponse, tags=["Projects"])
 def create_project(
@@ -137,7 +137,7 @@ def update_project_onboarding(
 ):
     project = db.query(ProjectModel).filter(
         ProjectModel.id == project_id,
-        ProjectModel.user_id == current_user.id   # ← user can only edit their own
+        ProjectModel.user_id == current_user.id   
     ).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -173,7 +173,7 @@ def get_project(
     return project
 
 
-# ─── AI Copilot ───────────────────────────────────────────────────────────────
+# AI Copilot 
 
 @app.post("/projects/{project_id}/analyze", response_model=AIAnalysisResponse, tags=["AI Copilot"])
 def generate_project_analysis(

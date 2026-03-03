@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.user import User
 from app.core.config import settings
 
-# Use sha256_crypt instead of bcrypt to avoid version compatibility issues
+
 pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 bearer_scheme = HTTPBearer()

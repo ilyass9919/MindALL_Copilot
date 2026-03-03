@@ -3,17 +3,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# 1. Create the engine
-# check_same_thread=False is only needed for SQLite, but good to know
+# Create the engine
 engine = create_engine(settings.DATABASE_URL)
 
-# 2. Create a SessionLocal class (the factory for DB sessions)
+# Create a SessionLocal class for creating DB sessions
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 3. Create a Base class for our models to inherit from
+# Create a Base class for our models to inherit from
 Base = declarative_base()
 
-# 4. Dependency to get the DB session in our routes (Common Interview Question!)
+# Dependency to get the DB session in our routes
 def get_db():
     db = SessionLocal()
     try:

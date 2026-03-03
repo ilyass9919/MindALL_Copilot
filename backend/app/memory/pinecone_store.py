@@ -12,7 +12,7 @@ class PineconeMemoryStore:
     """
 
     INDEX_NAME = "mindall-memory"
-    DIMENSION = 1536  # text-embedding-3-small dimension
+    DIMENSION = 1536  
 
     def __init__(self):
         # Initialize Pinecone client

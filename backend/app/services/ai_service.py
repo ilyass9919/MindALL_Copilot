@@ -7,7 +7,7 @@ class MindAllAIService:
         self.llm = ChatOpenAI(
             api_key=settings.OPENAI_API_KEY, 
             base_url=settings.OPENAI_BASE_URL, 
-            model="gpt-4o-mini", # You can also use "meta-llama-3-70b-instruct"
+            model="gpt-4o-mini", # we can test "meta-llama-3-70b-instruct" 
             temperature=0.7
         )
     
