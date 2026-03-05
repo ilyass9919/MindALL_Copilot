@@ -24,9 +24,12 @@ app = FastAPI(
     description="MindAll Consulting - AI Entrepreneur Copilot Backend"
 )
 
+# CORS reads from .env instead of allowing everything 
+allowed_origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,11 +70,9 @@ async def health_check():
 
 @app.post("/auth/register", response_model=TokenResponse, tags=["Auth"])
 def register(data: UserRegister, db: Session = Depends(get_db)):
-    """Register a new user and return a JWT token immediately."""
     existing = db.query(UserModel).filter(UserModel.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-
     user = UserModel(
         name=data.name,
         email=data.email,
@@ -80,7 +81,6 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-
     token = create_access_token(user.id)
     return TokenResponse(
         access_token=token,
@@ -90,11 +90,9 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @app.post("/auth/login", response_model=TokenResponse, tags=["Auth"])
 def login(data: UserLogin, db: Session = Depends(get_db)):
-    """Login with email + password, returns a JWT token."""
     user = db.query(UserModel).filter(UserModel.email == data.email).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-
     token = create_access_token(user.id)
     return TokenResponse(
         access_token=token,
@@ -104,7 +102,6 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 
 @app.get("/auth/me", response_model=UserResponse, tags=["Auth"])
 def get_me(current_user: UserModel = Depends(get_current_user)):
-    """Returns the currently logged-in user's info."""
     return current_user
 
 
@@ -137,11 +134,10 @@ def update_project_onboarding(
 ):
     project = db.query(ProjectModel).filter(
         ProjectModel.id == project_id,
-        ProjectModel.user_id == current_user.id   
+        ProjectModel.user_id == current_user.id
     ).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
     db.commit()
@@ -154,7 +150,6 @@ def list_projects(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """Returns only the current user's projects."""
     return db.query(ProjectModel).filter(ProjectModel.user_id == current_user.id).all()
 
 
@@ -187,9 +182,10 @@ def generate_project_analysis(
     ).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
     analysis_text = ai_service.analyze_project(
-        title=project.title, industry=project.industry, description=project.description
+        title=project.title,
+        industry=project.industry,
+        description=project.description
     )
     project.ai_analysis = analysis_text
     db.commit()
@@ -212,7 +208,6 @@ def chat_with_copilot(
 
     result = orchestrator.process(query=body.query, project=project)
 
-    # Save both messages to chat history
     db.add(ChatMessage(project_id=project_id, role="user", content=body.query))
     db.add(ChatMessage(
         project_id=project_id,
@@ -225,14 +220,12 @@ def chat_with_copilot(
     return ChatResponse(agent_used=result["agent_used"], response=result["response"])
 
 
-
 @app.get("/projects/{project_id}/messages", response_model=List[MessageResponse], tags=["AI Copilot"])
 def get_chat_history(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """Returns the full conversation history for a project."""
     project = db.query(ProjectModel).filter(
         ProjectModel.id == project_id,
         ProjectModel.user_id == current_user.id
@@ -252,6 +245,7 @@ def get_chat_history(
         created_at=m.created_at.isoformat()
     ) for m in messages]
 
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)

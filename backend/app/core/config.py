@@ -11,14 +11,17 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
     OPENAI_BASE_URL: str
-    PINECONE_API_KEY: str = ""
     TAVILY_API_KEY: str
+    PINECONE_API_KEY: str
     DATABASE_URL: str
 
     # JWT
-    JWT_SECRET: str = "we-should-change-this-to-a-secure-random-string"
+    JWT_SECRET: str = "change-this-in-production-please"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 48
+
+    # CORS 
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(
         env_file=env_path,
@@ -27,4 +30,3 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-

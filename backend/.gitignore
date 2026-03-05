@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.env
+
+# Database
+*.db
+*.sqlite3
+chroma_db/
+# Backend environment variables
+backend/.env
+# Local environment variables
+.env.local
+
+# Logs
+*.log
+# OS generated files
+.DS_Store
+Thumbs.db       
+# IDEs and editors
+.vscode/

@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.agents.marketing_agent import MarketingAgent
 from app.agents.finance_agent import FinanceAgent
 from app.agents.strategy_agent import StrategyAgent
-from app.memory.chroma_store import memory_store
+from app.memory.pinecone_store import memory_store
 
 
 AGENT_REGISTRY = {

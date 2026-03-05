@@ -56,6 +56,10 @@ class BaseAgent(ABC):
                 "RELEVANT PAST INTERACTIONS:\n{memory_context}\n\n"
                 "LIVE WEB DATA:\n{web_context}\n\n"
                 "ENTREPRENEUR'S QUESTION:\n{query}\n\n"
+                "IMPORTANT: Detect the language of the entrepreneur's question and reply "
+                "in that exact same language. If the question is in French, answer in French. "
+                "If in English, answer in English. If in Arabic, answer in Arabic. "
+                "Always match the user's language — never switch to another language.\n\n"
                 "Use the web data to ground your advice in real market conditions. "
                 "Cite specific data points from the web results when relevant."
             ))

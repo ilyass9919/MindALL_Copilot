@@ -1,84 +1,129 @@
 from pinecone import Pinecone, ServerlessSpec
-from langchain_openai import OpenAIEmbeddings
-from app.core.config import settings
+from openai import AzureOpenAI
 from datetime import datetime
-import json
+from app.core.config import settings
+import hashlib
 
 
 class PineconeMemoryStore:
     """
-    Handles saving and retrieving conversation context from Pinecone.
-    Each vector = one interaction, tagged with project_id and agent_type.
+    Cloud vector memory using Pinecone Serverless (free tier).
+    Replaces ChromaDB — survives server restarts, no disk needed.
+
+    Each vector = one Q&A interaction, namespaced by project_id.
+    Uses OpenAI text-embedding-3-small to generate embeddings.
     """
 
     INDEX_NAME = "mindall-memory"
-    DIMENSION = 1536  
+    DIMENSION  = 1536          # text-embedding-3-small output size
+    METRIC     = "cosine"
 
     def __init__(self):
-        # Initialize Pinecone client
-        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        # Pinecone client
+        self.pc = Pinecone(api_key=settings.PINECONE_API_KEY)
 
-        # Create index if it doesn't exist
-        existing = [i.name for i in pc.list_indexes()]
+        # Create index if it doesn't exist yet
+        existing = [i.name for i in self.pc.list_indexes()]
         if self.INDEX_NAME not in existing:
-            pc.create_index(
+            self.pc.create_index(
                 name=self.INDEX_NAME,
                 dimension=self.DIMENSION,
-                metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region="us-east-1")
+                metric=self.METRIC,
+                spec=ServerlessSpec(
+                    cloud="aws",
+                    region="us-east-1"  
+                )
             )
 
-        self.index = pc.Index(self.INDEX_NAME)
+        self.index = self.pc.Index(self.INDEX_NAME)
 
-        # Use OpenAI embeddings 
-        self.embeddings = OpenAIEmbeddings(
+        # OpenAI embeddings client 
+        self.embed_client = AzureOpenAI(
             api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
+            azure_endpoint=settings.OPENAI_BASE_URL,
+            api_version="2024-02-01"
+        )
+
+    def _embed(self, text: str) -> list[float]:
+        """Generate an embedding vector for a text string."""
+        response = self.embed_client.embeddings.create(
+            input=text,
             model="text-embedding-3-small"
         )
+        return response.data[0].embedding
+
+    def _make_id(self, project_id: int, query: str) -> str:
+        """Create a stable unique ID for a vector."""
+        raw = f"proj-{project_id}-{query}-{datetime.utcnow().timestamp()}"
+        return hashlib.md5(raw.encode()).hexdigest()
 
     def save_interaction(self, project_id: int, query: str, response: str, agent_type: str):
-        """Save a Q&A interaction to Pinecone memory."""
+        """Embed and store a Q&A interaction in Pinecone."""
         text = f"Question: {query}\nAnswer: {response}"
-        vector = self.embeddings.embed_query(text)
-
-        self.index.upsert(vectors=[{
-            "id": f"proj-{project_id}-{datetime.utcnow().timestamp()}",
-            "values": vector,
-            "metadata": {
-                "project_id": str(project_id),
-                "agent_type": agent_type,
-                "query": query,
-                "response": response[:500],  # Pinecone metadata limit
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        }])
+        try:
+            vector = self._embed(text)
+            self.index.upsert(
+                vectors=[{
+                    "id": self._make_id(project_id, query),
+                    "values": vector,
+                    "metadata": {
+                        "project_id": str(project_id),
+                        "agent_type": agent_type,
+                        "query": query,
+                        "response": response[:1000],    # Pinecone metadata limit
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                }],
+                namespace=f"project-{project_id}"       # isolate per project
+            )
+        except Exception as e:
+            # Memory save failing should never crash the chat
+            print(f"[PineconeMemory] save_interaction error: {e}")
 
     def retrieve_context(self, project_id: int, query: str, top_k: int = 3) -> str:
-        """Retrieve the most relevant past interactions for a given query."""
-        vector = self.embeddings.embed_query(query)
-
-        results = self.index.query(
-            vector=vector,
-            top_k=top_k,
-            filter={"project_id": {"$eq": str(project_id)}},
-            include_metadata=True
-        )
-
-        if not results.matches:
-            return "No previous context found."
-
-        context_parts = []
-        for match in results.matches:
-            meta = match.metadata
-            context_parts.append(
-                f"[{meta.get('agent_type', 'general')}] "
-                f"Q: {meta.get('query', '')} → "
-                f"A: {meta.get('response', '')}"
+        """Retrieve the most semantically relevant past interactions."""
+        try:
+            vector = self._embed(query)
+            results = self.index.query(
+                vector=vector,
+                top_k=top_k,
+                namespace=f"project-{project_id}",
+                include_metadata=True
             )
 
-        return "\n".join(context_parts)
+            if not results.matches:
+                return "No previous context found."
+
+            # Only use results with reasonable similarity (score > 0.5)
+            relevant = [m for m in results.matches if m.score > 0.5]
+            if not relevant:
+                return "No previous context found."
+
+            parts = []
+            for match in relevant:
+                meta = match.metadata
+                parts.append(
+                    f"[{meta.get('agent_type', 'general')}] "
+                    f"Q: {meta.get('query', '')} → "
+                    f"A: {meta.get('response', '')}"
+                )
+
+            return "\n".join(parts)
+
+        except Exception as e:
+            print(f"[PineconeMemory] retrieve_context error: {e}")
+            return "No previous context found."
+
+    def delete_project_memory(self, project_id: int):
+        """Delete all vectors for a project (useful for cleanup)."""
+        try:
+            self.index.delete(
+                delete_all=True,
+                namespace=f"project-{project_id}"
+            )
+        except Exception as e:
+            print(f"[PineconeMemory] delete error: {e}")
 
 
-# Singleton instance
+# Singleton — initialized once when the backend starts
 memory_store = PineconeMemoryStore()

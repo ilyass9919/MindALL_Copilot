@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: mindall-backend
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false          # You'll set this in Render dashboard
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///./data/mindall.db
+      - key: JWT_SECRET
+        generateValue: true  # Render auto-generates a secure random value
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_HOURS
+        value: "48"
+      - key: ALLOWED_ORIGINS
+        sync: false          # Set this to your Vercel URL after deploying frontend
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+    disk:
+      name: mindall-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1

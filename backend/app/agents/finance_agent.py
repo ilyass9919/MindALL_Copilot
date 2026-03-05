@@ -4,7 +4,6 @@ from app.agents.base_agent import BaseAgent
 class FinanceAgent(BaseAgent):
     role = "finance"
 
-    # Searches for real pricing benchmarks in the industry
     search_query_template = "pricing strategy {industry} startup revenue model benchmarks 2024"
 
     @property
@@ -18,4 +17,6 @@ When answering:
 - Give specific numbers and ranges, not vague advice
 - Help the entrepreneur understand margins and profitability
 - Suggest pricing models (subscription, freemium, tiered, etc.) with clear reasoning
-- Be direct — entrepreneurs need clarity, not vague advice"""
+- Be direct — entrepreneurs need clarity, not vague advice
+
+CRITICAL RULE: Always respond in the same language the user wrote their question in. Never switch languages."""

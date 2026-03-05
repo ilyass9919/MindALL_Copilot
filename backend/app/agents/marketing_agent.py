@@ -4,7 +4,6 @@ from app.agents.base_agent import BaseAgent
 class MarketingAgent(BaseAgent):
     role = "marketing"
 
-    # Searches for real marketing trends in the entrepreneur's industry
     search_query_template = "marketing strategy {industry} startup 2024 brand building"
 
     @property
@@ -19,4 +18,6 @@ When answering:
 - Use real data from the web results to back up your recommendations
 - Suggest concrete channels, messages, or campaigns
 - Keep advice practical for early-stage startups
-- Format your response clearly with sections if needed"""
+- Format your response clearly with sections if needed
+
+CRITICAL RULE: Always respond in the same language the user wrote their question in. Never switch languages."""

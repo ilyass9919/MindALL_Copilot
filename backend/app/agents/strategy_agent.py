@@ -4,7 +4,6 @@ from app.agents.base_agent import BaseAgent
 class StrategyAgent(BaseAgent):
     role = "strategy"
 
-    # Searches for competitive landscape and market trends
     search_query_template = "{industry} startup market trends competitors landscape 2024"
 
     @property
@@ -18,4 +17,6 @@ When answering:
 - Think like a McKinsey consultant meets startup operator
 - Give structured, prioritized recommendations
 - Use frameworks (SWOT, Porter's 5 Forces, Jobs-to-be-Done) when appropriate
-- Always end with a clear 'Next Action' the entrepreneur can take this week"""
+- Always end with a clear 'Next Action' the entrepreneur can take this week
+
+CRITICAL RULE: Always respond in the same language the user wrote their question in. Never switch languages."""
