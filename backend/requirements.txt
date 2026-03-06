@@ -3,7 +3,7 @@ uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 aiosqlite==0.20.0
 langchain==0.3.21
-langchain-openai==0.2.21
+langchain-openai==0.3.35
 langchain-core==0.3.47
 langchain-community==0.3.20
 openai==1.68.2
