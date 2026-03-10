@@ -7,13 +7,13 @@
 
 ## Features
 
--  **3 Specialized AI Agents** — Marketing, Finance, and Strategy, each with domain-specific expertise
--  **Automatic Routing** — An AI orchestrator reads your question and selects the right agent instantly
--  **Multilingual** — Responds in the user's language automatically (French, English, Arabic...)
--  **Live Web Data** — Every response is grounded with real-time market data via Tavily Search
--  **Persistent Memory** — Conversation history stored as vector embeddings in Pinecone
--  **Secure Auth** — JWT authentication with bcrypt password hashing
--  **Multi-project** — Each user can manage multiple independent projects
+-  **3 Specialized AI Agents** : Marketing, Finance, and Strategy, each with domain-specific expertise
+-  **Automatic Routing** : An AI orchestrator reads your question and selects the right agent instantly
+-  **Multilingual** : Responds in the user's language automatically (French, English, Arabic...)
+-  **Live Web Data** : Every response is grounded with real-time market data via Tavily Search
+-  **Persistent Memory** : Conversation history stored as vector embeddings in Pinecone
+-  **Secure Auth** : JWT authentication with bcrypt password hashing
+-  **Multi-project** : Each user can manage multiple independent projects
 
 ---
 
@@ -154,9 +154,9 @@ MindAll_Copilot/
 | Service | Platform | Notes |
 |---|---|---|
 | Frontend | Vercel | Auto-deploy from GitHub |
-| Backend | Render | Free tier — 30s cold start |
-| Database | Render PostgreSQL | Free tier — 1GB |
-| Memory | Pinecone Serverless | Free tier — 100k vectors |
+| Backend | Render | Free tier - 30s cold start |
+| Database | Render PostgreSQL | Free tier - 1GB |
+| Memory | Pinecone Serverless | Free tier - 100k vectors |
 
 Set `DATABASE_URL` on Render to the **Internal** PostgreSQL URL.  
 Set `ALLOWED_ORIGINS` on Render to your exact Vercel URL (no trailing slash).
